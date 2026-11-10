@@ -1,0 +1,32 @@
+# Merge into the WHOLESALE binary's config.toml; restart to apply.
+# IDs below are examples, replace with actual database IDs.
+[proxy.quality]
+receive_timeout_secs = 15
+url = "ws://127.0.0.1:8095/v1/quality"
+enabled = false
+sides = "callee" # caller | callee | both
+# headers = [["Authorization", "Bearer replace-with-a-secret"]]
+
+[proxy.quality.parameters]
+beep_enabled = true
+asr_enabled = false
+# asr_languages = ["id", "en"] # service must have both models loaded
+# hangup_on_asr = false
+frequencies_hz = [1309.0, 660.0]
+min_tone_ms = 160
+max_gap_ms = 40
+inspect_ms = 30000
+hangup_on_beep = false
+
+# Disable item 20, explicitly enable item 21.
+[addons.wholesale.quality.route_items]
+"20" = false
+"21" = true
+
+# Tenant 1 gets its own service endpoint and parameters.
+[addons.wholesale.quality.tenants."1"]
+url = "ws://127.0.0.1:8095/v1/quality"
+# sides = "both" # optional tenant override
+# enabled = true # optional: tenant default; route item can override
+[addons.wholesale.quality.tenants."1".parameters]
+max_gap_ms = 0

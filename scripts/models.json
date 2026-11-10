@@ -1,0 +1,22 @@
+{
+  "id": {
+    "repository": "spacewave/sherpa-onnx-streaming-zipformer2-id",
+    "revision": "4e5a13cbe3e9cd4e3775447d86178ef51759096f",
+    "sha256": {
+      "encoder-iter-100000-avg-15-chunk-32-left-256.int8.onnx": "3a6f85f5d199ad0d495562988af017a75d4ae81b51126db240d959b065d6eaad",
+      "decoder-iter-100000-avg-15-chunk-32-left-256.onnx": "e4b0c49fdd0a2da91ba99a2d2bbf4e392149c19e6abb4d4bc144c5d5f7d7a3e8",
+      "joiner-iter-100000-avg-15-chunk-32-left-256.int8.onnx": "4b89d96292460a92dedcb39e0b17904f10dbad335a8ab11015e567b4864102e0",
+      "tokens.txt": "f0b6f5bf602d96f60d79bb17192c51eeffb6189250f132b1dfdf72b130d66968"
+    }
+  },
+  "en": {
+    "repository": "csukuangfj/sherpa-onnx-streaming-zipformer-en-2023-06-26",
+    "revision": "672fbf1b30579d6585301139bb363f42a0ad4a24",
+    "sha256": {
+      "encoder-epoch-99-avg-1-chunk-16-left-128.int8.onnx": "563fde436d16cf7607cf408cd6b30909819d03162652ef389c2450ced3f45ac1",
+      "decoder-epoch-99-avg-1-chunk-16-left-128.onnx": "7bf787f90b194b307e5a4ad6a34fadb4e748304c35f78a8d66358a05b13ee6ef",
+      "joiner-epoch-99-avg-1-chunk-16-left-128.int8.onnx": "d944208d660d67c8d72cd2acaeac971fa5ceb8c80e76c1968148846fedd6e297",
+      "tokens.txt": "49e3c2646595fd907228b3c6787069658f67b17377c60aeb8619c4551b2316fb"
+    }
+  }
+}

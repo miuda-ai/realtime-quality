@@ -1,0 +1,21 @@
+[Unit]
+Description=Realtime voicemail quality service
+After=network.target
+
+[Service]
+Type=simple
+User=realtime-quality
+Group=realtime-quality
+WorkingDirectory=/var/lib/realtime-quality
+ExecStart=/opt/realtime-quality/realtime-quality --config /etc/realtime-quality/config.toml
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

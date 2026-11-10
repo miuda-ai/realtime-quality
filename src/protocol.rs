@@ -40,4 +40,3 @@ pub(crate) enum QualityResponse<'a> {
     },
     Hangup { reason: &'a str, detail: &'a VoicemailEvidence },
 }
-

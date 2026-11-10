@@ -132,4 +132,3 @@ mod interference_tests {
         assert!(Detector::new(Parameters::default(), 16000).unwrap().push(&samples).is_empty());
     }
 }
-

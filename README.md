@@ -24,7 +24,7 @@ cp config.example.toml /absolute/path/quality.toml
 curl http://127.0.0.1:8095/health
 ```
 
-示例配置默认只启用 beep、只报告检测、不主动挂断。无需模型或 GPU。进程加载资源成功后才监听端口，`/health` 返回 `ok`。配置修改后重启服务，不热加载模型。
+示例配置默认只启用 beep、只报告检测、不主动挂断。跨机器部署时，将 `listen` 改为服务内网地址或 `0.0.0.0:8095`。无需模型或 GPU。进程加载资源成功后才监听端口，`/health` 返回 `ok`。配置修改后重启服务，不热加载模型。
 
 ## 配置
 
@@ -169,7 +169,7 @@ beep 同样报告 `quality.voicemail_detected`，detail 为 `{"method":"beep","d
 ```bash
 sudo useradd --system --home-dir /var/lib/realtime-quality --shell /usr/sbin/nologin realtime-quality
 sudo install -d -o realtime-quality -g realtime-quality /var/lib/realtime-quality
-sudo install -d -m 0750 /etc/realtime-quality
+sudo install -d -m 0750 -o root -g realtime-quality /etc/realtime-quality
 sudo install -m 0640 -o root -g realtime-quality config.example.toml /etc/realtime-quality/config.toml
 # 编辑配置、下载模型并确保服务账户可读，然后：
 sudo install -m 0644 deploy/realtime-quality.service /etc/systemd/system/

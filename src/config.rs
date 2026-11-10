@@ -82,12 +82,12 @@ impl Parameters {
         }
         anyhow::ensure!((8000..=48000).contains(&rate), "unsupported sample rate");
         if self.beep_enabled {
-        anyhow::ensure!(!self.frequencies_hz.is_empty() && self.frequencies_hz.len() <= 16, "expected 1..16 frequencies");
-        anyhow::ensure!(self.tolerance_hz.is_finite() && (0.0..=100.0).contains(&self.tolerance_hz), "invalid frequency tolerance");
-        anyhow::ensure!(self.frequencies_hz.iter().all(|f| f.is_finite() && *f > self.tolerance_hz && *f + self.tolerance_hz < rate as f64 / 2.0), "frequency outside Nyquist range");
-        anyhow::ensure!((20..=5000).contains(&self.min_tone_ms) && self.max_gap_ms <= 500, "invalid tone duration/gap");
-        anyhow::ensure!(self.min_dbfs.is_finite() && (-90.0..=0.0).contains(&self.min_dbfs), "invalid dBFS threshold");
-        anyhow::ensure!(self.min_energy_ratio.is_finite() && (0.5..=1.0).contains(&self.min_energy_ratio), "invalid energy ratio");
+            anyhow::ensure!(!self.frequencies_hz.is_empty() && self.frequencies_hz.len() <= 16, "expected 1..16 frequencies");
+            anyhow::ensure!(self.tolerance_hz.is_finite() && (0.0..=100.0).contains(&self.tolerance_hz), "invalid frequency tolerance");
+            anyhow::ensure!(self.frequencies_hz.iter().all(|f| f.is_finite() && *f > self.tolerance_hz && *f + self.tolerance_hz < rate as f64 / 2.0), "frequency outside Nyquist range");
+            anyhow::ensure!((20..=5000).contains(&self.min_tone_ms) && self.max_gap_ms <= 500, "invalid tone duration/gap");
+            anyhow::ensure!(self.min_dbfs.is_finite() && (-90.0..=0.0).contains(&self.min_dbfs), "invalid dBFS threshold");
+            anyhow::ensure!(self.min_energy_ratio.is_finite() && (0.5..=1.0).contains(&self.min_energy_ratio), "invalid energy ratio");
         }
         anyhow::ensure!((20..=300000).contains(&self.inspect_ms), "inspection duration must be 20..300000 ms");
         Ok(())

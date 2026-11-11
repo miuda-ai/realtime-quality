@@ -1,5 +1,7 @@
 # Realtime Quality
 
+源码与发布：[GitHub / miuda-ai/realtime-quality](https://github.com/miuda-ai/realtime-quality)。
+
 独立的 RustPBX 实时语音信箱检测服务。只覆盖：
 
 - 英语（`en`）和印尼语／Bahasa Indonesia（`id`）的流式 ASR + 配置关键词匹配。

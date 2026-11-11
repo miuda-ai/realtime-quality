@@ -21,7 +21,7 @@ mkdir -p "$stage/$name/scripts" "$stage/$name/deploy" dist
 cp "target/$target/release/realtime-quality" "$stage/$name/"
 cp README.md config.example.toml wholesale.example.toml "$stage/$name/"
 cp scripts/download_models.py scripts/models.json "$stage/$name/scripts/"
-cp deploy/realtime-quality.service "$stage/$name/deploy/"
+cp deploy/realtime-quality.service deploy/postgresql-quality-upgrade.sql "$stage/$name/deploy/"
 "$stage/$name/realtime-quality" --version
 if [[ "$target" == *linux* ]]; then
   ldd "$stage/$name/realtime-quality" | tee "$stage/linkage.txt"

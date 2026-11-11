@@ -1,29 +1,24 @@
-# Merge into the WHOLESALE binary's config.toml; restart to apply.
-# IDs below are examples, replace with actual database IDs.
+# Merge these tables into the wholesale application's existing config.
+# Replace the URL and token. Do not duplicate an existing [proxy.quality] table.
 [proxy.quality]
+enabled = true
+url = "ws://127.0.0.1:8096/v1/quality"
+sides = "callee"
 receive_timeout_secs = 15
-url = "ws://127.0.0.1:8095/v1/quality"
-enabled = false
-sides = "callee" # caller | callee | both
-# headers = [["Authorization", "Bearer replace-with-a-secret"]]
+headers = [["Authorization", "Bearer YOUR_SERVICE_TOKEN"]]
 
 [proxy.quality.parameters]
+asr_enabled = true
+asr_languages = ["en", "id"]
 beep_enabled = true
-asr_enabled = false
-# asr_languages = ["id", "en"] # service must have both models loaded
 frequencies_hz = [1309.0, 660.0]
-min_tone_ms = 160
-max_gap_ms = 40
-inspect_ms = 15000
+stable_updates = 2
+inspect_ms = 20000
 hangup_on_detection = false
-
-# For ASR, enable it above and provide keywords for every selected language:
-# stable_updates = 2
-# keywords = [
-#   { language = "id", phrase = "layanan pesan suara" },
-#   { language = "id", sequence = ["rekam", "setelah mendengar nada"], max_gap_words = 10 },
-#   { language = "en", phrase = "forwarded to voicemail" },
-#   { language = "en", phrase = "forwarded to voice mail" },
-# ]
-# Wholesale console policies supply the same parameters in start.parameters.
-# Tenant and route-item selections can inherit, disable, or select a saved policy.
+keywords = [
+  { language = "en", phrase = "forwarded to voicemail" },
+  { language = "en", phrase = "forwarded to voice mail" },
+  { language = "en", sequence = ["please record", "after the tone"], max_gap_words = 4 },
+  { language = "id", phrase = "layanan pesan suara" },
+  { language = "id", sequence = ["rekam", "setelah mendengar nada"], max_gap_words = 10 },
+]

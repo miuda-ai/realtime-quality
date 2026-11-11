@@ -23,9 +23,7 @@ pub(crate) struct Session {
 }
 
 pub(crate) fn load(language: &str, model: &ModelConfig) -> Result<OnlineRecognizer> {
-    ensure!((1..=32).contains(&model.num_threads), "ASR num_threads must be 1..32, got {}", model.num_threads);
-    ensure!((1..=64).contains(&model.max_batch_size), "max_batch_size must be 1..64");
-    ensure!(model.max_wait_ms <= 100, "max_wait_ms must be 0..100");
+    model.validate()?;
     for path in [&model.encoder, &model.decoder, &model.joiner, &model.tokens] {
         ensure!(std::path::Path::new(path).is_file(), "ASR model asset missing: {path}");
     }

@@ -25,6 +25,14 @@ pub struct ModelConfig {
     #[serde(default = "default_batch_wait")]
     pub max_wait_ms: u64,
 }
+impl ModelConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!((1..=32).contains(&self.num_threads), "ASR num_threads must be 1..32, got {}", self.num_threads);
+        anyhow::ensure!((1..=64).contains(&self.max_batch_size), "max_batch_size must be 1..64, got {}", self.max_batch_size);
+        anyhow::ensure!(self.max_wait_ms <= 100, "max_wait_ms must be 0..100, got {}", self.max_wait_ms);
+        Ok(())
+    }
+}
 fn one() -> i32 { 1 }
 fn default_batch_size() -> usize { 4 }
 fn default_batch_wait() -> u64 { 5 }

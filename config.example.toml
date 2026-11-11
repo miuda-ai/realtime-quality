@@ -1,34 +1,10 @@
 listen = "127.0.0.1:8095"
 # token = "replace-with-a-secret" # PBX sends Authorization: Bearer <token>
-[detector]
-# Each connection may override these fields in start.parameters.
-beep_enabled = true
-asr_enabled = false
-asr_languages = ["id", "en"]
-stable_updates = 2
-hangup_on_asr = false
-# Optional subtitles from ONE model; both models can still match keywords.
-# text_language = "id"
-keywords = [
-  { language = "id", phrase = "layanan pesan suara" },
-  { language = "id", phrase = "rekam pesan anda setelah" },
-  { language = "en", phrase = "forwarded to voicemail" },
-  { language = "en", phrase = "forwarded to voice mail" },
-  { language = "en", phrase = "please record your message after the tone" },
-  { language = "en", phrase = "welcome to voicemail service" },
-  { language = "en", phrase = "welcome to voice mail service" },
-]
-frequencies_hz = [1309.0, 660.0]
-tolerance_hz = 20.0
-min_tone_ms = 160
-max_gap_ms = 40
-min_dbfs = -35.0
-min_energy_ratio = 0.8
-inspect_ms = 30000
-hangup_on_beep = false
+# Detection settings are supplied per connection in start.parameters.
+# See wholesale.example.toml for a PBX request configuration.
 
 # Models are loaded once at startup. Use absolute paths outside the source tree.
-# Uncomment model tables and set asr_enabled=true to enable local streaming ASR.
+# Uncomment model tables to load ASR resources; each connection selects asr_enabled and languages.
 # Each model requires a matching streaming transducer encoder/decoder/joiner/tokens set.
 # [models.id]
 # encoder = "/var/lib/realtime-quality/models/id/encoder-iter-100000-avg-15-chunk-32-left-256.int8.onnx"

@@ -1,7 +1,7 @@
 //! Each language worker owns one recognizer and batches ready streams from different connections.
 use std::{collections::{BTreeMap, HashMap, VecDeque}, sync::{Arc, mpsc, atomic::{AtomicBool, AtomicU64, Ordering}}, time::{Duration, Instant}};
 use bytes::Bytes;
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use tokio::sync::{mpsc as async_mpsc, oneshot};
 use crate::{asr::{self, Session, Output}, config::{ModelConfig, Parameters}};
 
@@ -49,7 +49,10 @@ impl RecognitionWorkers {
     pub fn load(configs: &BTreeMap<String, ModelConfig>) -> Result<Self> {
         let mut languages = BTreeMap::new();
         for (language, config) in configs {
-            let model = asr::load(language, config)?;
+            let model = asr::load(language, config)
+                .with_context(|| format!("prepare ASR model for {language}"))?;
+            tracing::info!(language, num_threads = config.num_threads,
+                max_batch_size = config.max_batch_size, "ASR model loaded");
             let key = language.clone();
             let language = language.clone();
             let max_batch_size = config.max_batch_size;

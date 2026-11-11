@@ -182,6 +182,16 @@ journalctl -u realtime-quality -f
 
 前台 macOS：`./realtime-quality --config /absolute/path/quality.toml`，Ctrl-C 退出。若配置 token，PBX headers 必须一致。不要把真实 token 或本机模型路径提交到 Git。
 
+## 日志
+
+服务使用 `tracing` 输出带时间、级别和字段的 stderr 日志；默认 `info`。通过 `RUST_LOG` 调整过滤，例如：
+
+```bash
+RUST_LOG=info,realtime_quality=debug ./realtime-quality --config /etc/realtime-quality/config.toml
+```
+
+`ensure!` / `bail!` 负责返回错误，不直接打印。启动失败在 main 统一记录完整错误链并以非零状态退出；模型错误包含语言上下文。WebSocket 错误在连接边界记录，解析 start 后附带 call_id、session_id、side。正常关闭为 debug，队列拥塞为 warn。不逐帧记录音频或转录文本，也不打印配置 token。systemd 部署使用 `journalctl -u realtime-quality -f` 查看日志；库本身不安装全局 subscriber，由宿主控制日志。
+
 ## 编译、测试、发布 CI
 
 需要 Rust stable（edition 2024）、C/C++ 链接工具；macOS 安装 Xcode Command Line Tools。sherpa-onnx-sys 自动获取匹配目标的原生静态库；需要访问其 GitHub Releases。离线构建可预置 `SHERPA_ONNX_ARCHIVE_DIR` 或 `SHERPA_ONNX_LIB_DIR`（见上游 crate 文档）。静态链接 sherpa/ONNX，不表示整个 Linux 系统依赖均静态链接。

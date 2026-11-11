@@ -4,6 +4,7 @@ use anyhow::Result;
 use dasp_sample::Sample;
 use axum::{Router, extract::{State, WebSocketUpgrade, ws::{Message, WebSocket}}, http::{HeaderMap, StatusCode}, response::IntoResponse, routing::get};
 use futures::SinkExt;
+use tracing::Instrument;
 use crate::{QualityService, asr, audio::PcmFrames, beep::Detector, config::Parameters,
     protocol::{Start, QualityResponse, VoicemailEvidence}};
 
@@ -23,12 +24,22 @@ async fn upgrade(State(service): State<Arc<QualityService>>, headers: HeaderMap,
     };
     ws.max_message_size(65536).max_frame_size(65536).on_upgrade(move |socket| async move {
         let _permit = permit;
-        if let Err(error) = inspect(socket, service).await { eprintln!("inspection ended: {error}"); }
-    }).into_response()
+        if let Err(error) = inspect(socket, service).await {
+            tracing::warn!(error = %format!("{error:#}"), "quality connection ended with error");
+        } else {
+            tracing::debug!("quality connection closed");
+        }
+    }.instrument(tracing::info_span!("quality_connection",
+        call_id = tracing::field::Empty, session_id = tracing::field::Empty,
+        side = tracing::field::Empty))).into_response()
 }
 async fn inspect(mut socket: WebSocket, service: Arc<QualityService>) -> Result<()> {
     let Some(Ok(Message::Text(start))) = tokio::time::timeout(Duration::from_secs(5), socket.recv()).await? else { anyhow::bail!("expected start"); };
     let start: Start = serde_json::from_str(&start)?;
+    let span = tracing::Span::current();
+    span.record("call_id", &start.call_id);
+    span.record("session_id", &start.session_id);
+    span.record("side", &start.side);
     anyhow::ensure!(start.kind == "start" && start.version == 1, "unsupported protocol version");
     anyhow::ensure!([start.tenant_id, start.inbound_trunk_id, start.outbound_trunk_id]
         .into_iter().flatten().all(|id| id > 0), "routing IDs must be positive");
@@ -45,6 +56,8 @@ async fn inspect(mut socket: WebSocket, service: Arc<QualityService>) -> Result<
     anyhow::ensure!(parameters.asr_enabled || parameters.beep_enabled, "no detector enabled");
     let mut detector = if parameters.beep_enabled { Some(Detector::new(parameters.clone(), 16000)?) } else { None };
     let mut asr = if parameters.asr_enabled { Some(service.worker.as_ref().ok_or_else(|| anyhow::anyhow!("no ASR models loaded"))?.open(parameters.clone()).await?) } else { None };
+    tracing::info!(sample_rate = start.sample_rate, asr_enabled = parameters.asr_enabled,
+        beep_enabled = parameters.beep_enabled, "quality inspection started");
     let mut observed = false;
     let mut hangup_sent = false;
     let deadline = tokio::time::sleep(Duration::from_millis(parameters.inspect_ms as u64));
@@ -84,7 +97,7 @@ async fn inspect(mut socket: WebSocket, service: Arc<QualityService>) -> Result<
                         if let Some(chunk) = audio.take_chunk() {
                             if let Some(engine) = &asr {
                                 if let Err(error) = engine.push(chunk) {
-                                    eprintln!("ASR disabled for {}: {error}", start.session_id);
+                                    tracing::warn!(error = %error, "ASR disabled for connection");
                                     asr = None;
                                     tokio::time::timeout(Duration::from_secs(5), socket.send(Message::Text(serde_json::to_string(&QualityResponse::Calltrace {
                                         kind: "quality", code: "quality.asr_failed", severity: "warn", message: "ASR queue full or closed", detail: None,
@@ -112,6 +125,7 @@ async fn inspect(mut socket: WebSocket, service: Arc<QualityService>) -> Result<
                 } else { incoming };
                 match incoming {
                     Some(asr::Output::QueueFull) => {
+                        tracing::warn!("ASR pending queue full; disabling recognition for connection");
                         asr = None;
                         tokio::time::timeout(Duration::from_secs(5), socket.send(Message::Text(serde_json::to_string(&QualityResponse::Calltrace {
                             kind: "quality", code: "quality.asr_failed", severity: "warn", message: "ASR pending queue full", detail: None,

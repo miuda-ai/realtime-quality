@@ -23,7 +23,7 @@ pub(crate) struct Session {
 }
 
 pub(crate) fn load(language: &str, model: &ModelConfig) -> Result<OnlineRecognizer> {
-    ensure!((1..=32).contains(&model.num_threads), "invalid ASR num_threads");
+    ensure!((1..=32).contains(&model.num_threads), "ASR num_threads must be 1..32, got {}", model.num_threads);
     ensure!((1..=64).contains(&model.max_batch_size), "max_batch_size must be 1..64");
     ensure!(model.max_wait_ms <= 100, "max_wait_ms must be 0..100");
     for path in [&model.encoder, &model.decoder, &model.joiner, &model.tokens] {
@@ -47,7 +47,6 @@ impl Session {
             output, config, samples: 0, matched: false }
     }
     pub fn report_queue_full(&self) {
-        eprintln!("ASR pending queue full for language {}; ending connection recognition", self.language);
         // The shared failure flag also covers a full output queue: the next queued
         // result or input submission observes failure even if this wakeup cannot fit.
         let _ = self.output.try_send(Output::QueueFull);
@@ -90,7 +89,7 @@ impl Session {
                 self.start_ms = end_ms;
             }
         }
-        if failed && !self.is_closed() { eprintln!("ASR result queue full; ending recognition"); }
+        if failed && !self.is_closed() { tracing::warn!(language = %self.language, "ASR result queue full; ending recognition"); }
         !failed && !self.finished(model)
     }
 }

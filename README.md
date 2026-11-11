@@ -10,7 +10,7 @@
 
 ## 快速启动：beep
 
-从 CNB Releases 获取匹配平台的压缩包及 `.sha256`，校验后解压。仅发布：
+从 [GitHub Releases](https://github.com/miuda-ai/realtime-quality/releases) 获取匹配平台的压缩包及 `.sha256`，校验后解压。仅发布：
 
 - `x86_64-unknown-linux-gnu`：Linux x86_64，构建基线 Debian 12/glibc 2.36；不是 musl 静态系统包。
 - `aarch64-apple-darwin`：Apple Silicon macOS，需满足对应 sherpa-onnx 原生库的系统要求。
@@ -194,9 +194,9 @@ bash scripts/package.sh aarch64-apple-darwin v0.1.0
 
 普通测试仅在内存生成信号，不写音频文件、不下载模型。可选真实模型 WebSocket 测试读取外部 `QUALITY_TEST_CONFIG`、`QUALITY_TEST_MODEL_DIR`、`QUALITY_TEST_LANGUAGE` 和 `QUALITY_TEST_WAV`；模型和录音必须位于项目之外。该测试验证流式输入，不把文件一次性提交给识别器。
 
-`.cnb.yml`：main push 跑 Linux 测试和资产检查；版本 tag push 分别原生构建 Linux x86_64 与 macOS arm64，上传 tar.gz 和 SHA-256。发布脚本先创建 draft，两个平台及校验文件齐全后才发布。版本标签必须和 Cargo.toml 版本对应（允许 `v` 前缀和预发布后缀）。
+`.github/workflows/release.yml`：main push、PR 或手动触发时，在 Linux x86_64 和 macOS arm64 上测试及打包，并上传保留 7 天的 Actions artifacts。`v*` tag 触发相同构建，两个平台都通过后，统一上传 tar.gz 和 SHA-256 到 GitHub Releases，再发布 draft。版本标签必须和 Cargo.toml 版本对应（允许预发布后缀）。
 
-**Mac CI 要求 CNB 组织自托管 runner，标签 `[mac, arm64]`**，已安装 Rust、Python 3.11+ 和 Xcode CLI。CNB 托管节点提供 Linux，不提供托管 macOS；本仓库不会在开发机擅自安装后台 runner。若组织使用其他标签，请修改 `.cnb.yml`。配置方式见 [CNB build nodes](https://docs.cnb.cool/en/build/build-node.html)。
+Linux 使用 GitHub 托管 Ubuntu runner 中的 Debian 12 构建容器；Mac 使用托管 `macos-15` arm64 runner，无需自托管机器。仓库 Actions 需要允许托管 runner；发布 job 使用自带 `GITHUB_TOKEN` 的 `contents: write` 权限，不需要另配个人 token。见 [GitHub runner 文档](https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job)。
 
 ```bash
 git tag v0.1.0

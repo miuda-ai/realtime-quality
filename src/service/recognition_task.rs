@@ -6,7 +6,7 @@ use axum::extract::ws::{Message, WebSocket};
 use dasp_sample::Sample;
 use futures::SinkExt;
 use tokio::{sync::watch, time::{Instant, Interval}};
-use crate::recognition::{InspectionParameters, AsrResultHandler, KeywordMatcher, RecognitionEvent, RecognitionResult, BeepDetector, RecognitionHandle, VoicemailEvidence};
+use crate::recognition::{AsrResultHandler, KeywordMatcher, RecognitionEvent, RecognitionResult, BeepDetector, RecognitionHandle, VoicemailEvidence};
 use super::{QualityService, audio::AudioProcessor, StartMessage, QualityEvent};
 
 pub(crate) struct RecognitionTask {
@@ -19,7 +19,7 @@ pub(crate) struct RecognitionTask {
     recognition: Option<RecognitionHandle>,
     asr_result_handler: Box<dyn AsrResultHandler>,
     last_subtitles: BTreeMap<String, String>,
-    parameters: InspectionParameters,
+    hangup_on_detection: bool,
     hangup_sent: bool,
     inspection_deadline: Instant,
     heartbeat: Interval,
@@ -71,7 +71,10 @@ impl RecognitionTask {
         };
         let mut heartbeat = tokio::time::interval_at(Instant::now() + Duration::from_secs(10), Duration::from_secs(10));
         heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-        Ok(Some(Self { socket, call_id, session_id, side, audio, beep_detector, recognition, asr_result_handler: Box::new(KeywordMatcher::new(&parameters)), last_subtitles: BTreeMap::new(), parameters,
+        let hangup_on_detection = parameters.hangup_on_detection
+            && (parameters.hangup_rate >= 1.0
+                || (parameters.hangup_rate > 0.0 && sample_unit_interval() < parameters.hangup_rate));
+        Ok(Some(Self { socket, call_id, session_id, side, audio, beep_detector, recognition, asr_result_handler: Box::new(KeywordMatcher::new(&parameters)), last_subtitles: BTreeMap::new(), hangup_on_detection,
             hangup_sent: false, inspection_deadline, heartbeat, shutdown }))
     }
     pub async fn run(mut self) -> Result<()> {
@@ -162,7 +165,7 @@ impl RecognitionTask {
         };
         self.send_event(&QualityEvent::Calltrace { kind: "quality", code: "quality.voicemail_detected",
             severity: "info", message, detail: Some(&detail) }).await?;
-        if self.parameters.hangup_on_detection && !self.hangup_sent {
+        if self.hangup_on_detection && !self.hangup_sent {
             self.send_event(&QualityEvent::Hangup { reason: "quality.voicemail_detected", detail: &detail }).await?;
             self.hangup_sent = true;
         }
@@ -181,6 +184,13 @@ impl RecognitionTask {
     }
 }
 
+fn sample_unit_interval() -> f64 {
+    use std::collections::hash_map::RandomState;
+    use std::hash::{BuildHasher, Hasher};
+    let bits = RandomState::new().build_hasher().finish();
+    (bits >> 11) as f64 * (1.0 / ((1u64 << 53) as f64))
+}
+
 async fn close(socket: &mut WebSocket) {
     // Independent of shutdown: allow either peer's Close handshake to finish.
     let _ = tokio::time::timeout(Duration::from_secs(1), async {
@@ -188,4 +198,22 @@ async fn close(socket: &mut WebSocket) {
         while let Some(message) = socket.recv().await { message?; }
         Ok::<_, axum::Error>(())
     }).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unit_interval_sampling_is_bounded_and_balanced() {
+        let mut below_half = 0usize;
+        for _ in 0..10_000 {
+            let sample = sample_unit_interval();
+            assert!((0.0..1.0).contains(&sample));
+            if sample < 0.5 {
+                below_half += 1;
+            }
+        }
+        assert!((4_500..=5_500).contains(&below_half), "unexpected sample distribution: {below_half}/10000");
+    }
 }

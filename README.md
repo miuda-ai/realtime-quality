@@ -434,7 +434,7 @@ code 表示判断，method 表示检测方法。当前只实现 voicemail 检测
  "detail":{"method":"asr","language":"en","end_ms":3100}}
 ```
 
-PBX 没有额外的 allow_hangup 开关；只标记模式由服务不发送 hangup 保证。本服务在 `hangup_on_detection=true` 时先发检测 trace，再发 hangup，随后结束质检并 Close；false 时持续报告独立检测直到 inspect_ms。PBX 最终 End trace 保存 `detail.source="realtime_quality"`、reason 和证据；不要只用通用 autohangup 枚举判断来源。
+PBX 没有额外的 allow_hangup 开关；只标记模式由服务不发送 hangup 保证。本服务在 `hangup_on_detection=true` 时先发检测 trace，再按 `hangup_rate`（默认 `1.0`，范围 `0.0–1.0`，仅在首次命中时按呼叫采样一次）决定是否发 hangup；决定挂断时立即发 hangup 并结束质检 Close，未命中采样或 `hangup_on_detection=false` 时持续报告独立检测直到 inspect_ms。PBX 最终 End trace 保存 `detail.source="realtime_quality"`、reason 和证据；不要只用通用 autohangup 枚举判断来源。
 
 **error：终止该质检连接，保持电话继续。**
 
@@ -480,7 +480,8 @@ PBX 先处理顺序到达的 trace/hangup，再处理 Close；控制队列使用
 | keywords | []，最多 256 条 | 每条 language + phrase，或 language + sequence + max_gap_words |
 | stable_updates | 2；1–10 | 同一规则连续多少次解码更新满足后确认；partial 也计数 |
 | inspect_ms | 15000；20–300000 | 连接观察时间；示例 20000；到期关闭质检，不结束电话 |
-| hangup_on_detection | false | ASR 和 beep 共用；true 时先 trace，再 hangup，随后 Close |
+| hangup_on_detection | false | ASR 和 beep 共用；true 时先 trace，再按 `hangup_rate` 决定是否 hangup 并 Close |
+| hangup_rate | 1.0；0.0–1.0 | 仅在 `hangup_on_detection=true` 且已检测到命中时生效；支持 `0`/`1` 或小数，单通呼叫首次命中时采样一次（`0` 不挂断，`1` 全部挂断） |
 
 #### 短句与顺序规则
 
@@ -502,7 +503,7 @@ phrase 匹配连续单词；忽略大小写、标点和连续空白，但要求�
 
 #### 重复检测
 
-hangup_on_detection=false 时，每段独立 beep、每种语言每个语句的首次确认命中都会上报。不限制连接总次数，但同一语句不断修正的 partial 不重复报告；持续的一段 tone 只报告一次。true 时仅发第一次检测的 trace 和 hangup，然后结束质检。
+hangup_on_detection=false 时，每段独立 beep、每种语言每个语句的首次确认命中都会上报。不限制连接总次数，但同一语句不断修正的 partial 不重复报告；持续的一段 tone 只报告一次。hangup_on_detection=true 时，首次命中会按 `hangup_rate` 决定整通呼叫是否挂断：命中采样则仅发第一次检测的 trace 和 hangup 后结束质检；未命中采样（或 `hangup_rate=0`）则不再挂断，继续上报后续独立检测的 trace 直到 inspect_ms。
 
 未检测到不等于真人：服务可以不发送任何结果，到观察截止时正常 Close。两种检测都关闭也正常结束连接。错误参数、未加载模型或服务不可达不应影响正常电话继续。
 

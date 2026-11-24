@@ -15,6 +15,7 @@ frequencies_hz = [1309.0, 660.0]
 stable_updates = 2
 inspect_ms = 20000
 hangup_on_detection = false
+# hangup_rate = 1.0 # 0.0..=1.0; only applies when hangup_on_detection = true (default 1.0)
 keywords = [
   { language = "en", phrase = "forwarded to voicemail" },
   { language = "en", phrase = "forwarded to voice mail" },

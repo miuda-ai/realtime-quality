@@ -33,6 +33,8 @@ pub struct InspectionParameters {
     #[validate(range(min = 1, max = 10))]
     pub stable_updates: u32,
     pub hangup_on_detection: bool,
+    #[validate(range(min = 0.0, max = 1.0), custom(function = "validate_finite"))]
+    pub hangup_rate: f64,
     #[validate(length(max = 16), custom(function = "validate_frequencies"))]
     pub frequencies_hz: Vec<f64>,
     #[validate(range(min = 0.0, max = 100.0), custom(function = "validate_finite"))]
@@ -52,7 +54,7 @@ impl Default for InspectionParameters {
     fn default() -> Self {
         Self { beep_enabled: true, asr_enabled: false, asr_languages: vec!["id".into()],
             keywords: Vec::new(),
-            stable_updates: 2, hangup_on_detection: false, frequencies_hz: vec![1309.0, 660.0], tolerance_hz: 20.0,
+            stable_updates: 2, hangup_on_detection: false, hangup_rate: 1.0, frequencies_hz: vec![1309.0, 660.0], tolerance_hz: 20.0,
             min_tone_ms: 160, max_gap_ms: 40, min_dbfs: -35.0,
             min_energy_ratio: 0.8, inspect_ms: 15000 }
     }
@@ -121,7 +123,8 @@ mod tests {
         use serde_json::json;
         for (field, value) in [("stable_updates", json!(0)), ("inspect_ms", json!(300001)),
             ("min_tone_ms", json!(19)), ("max_gap_ms", json!(501)), ("tolerance_hz", json!(101)),
-            ("min_dbfs", json!(1)), ("min_energy_ratio", json!(0.4))] {
+            ("min_dbfs", json!(1)), ("min_energy_ratio", json!(0.4)), ("hangup_rate", json!(-0.01)),
+            ("hangup_rate", json!(1.01))] {
             let parameters: InspectionParameters = serde_json::from_value(json!({field:value})).unwrap();
             assert!(parameters.validate().unwrap_err().field_errors().contains_key(field), "{field}");
         }
@@ -132,6 +135,8 @@ mod tests {
         assert!(rules[&0].field_errors().contains_key("phrase"));
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let parameters = InspectionParameters { tolerance_hz:value, ..Default::default() };
+            assert!(parameters.validate().is_err());
+            let parameters = InspectionParameters { hangup_rate:value, ..Default::default() };
             assert!(parameters.validate().is_err());
         }
         let parameters = InspectionParameters { frequencies_hz:vec![7990.0], tolerance_hz:20.0, ..Default::default() };
@@ -164,5 +169,22 @@ mod tests {
         assert!(parameters.validate().is_ok());
         parameters.asr_languages.push("fr".into());
         assert!(parameters.validate().is_err());
+    }
+
+    #[test]
+    fn hangup_rate_defaults_to_one_and_accepts_integers_and_floats() {
+        use serde_json::json;
+        assert_eq!(InspectionParameters::default().hangup_rate, 1.0);
+        for (raw, expected) in [(json!(0), 0.0), (json!(0.0), 0.0), (json!(0.25), 0.25), (json!(1), 1.0), (json!(1.0), 1.0)] {
+            let parameters: InspectionParameters = serde_json::from_value(json!({"hangup_rate": raw})).unwrap();
+            parameters.validate().unwrap();
+            assert_eq!(parameters.hangup_rate, expected);
+        }
+        for (raw, expected) in [("hangup_rate = 0", 0.0), ("hangup_rate = 0.0", 0.0),
+            ("hangup_rate = 0.5", 0.5), ("hangup_rate = 1", 1.0), ("hangup_rate = 1.0", 1.0)] {
+            let parameters: InspectionParameters = toml::from_str(raw).unwrap();
+            parameters.validate().unwrap();
+            assert_eq!(parameters.hangup_rate, expected);
+        }
     }
 }

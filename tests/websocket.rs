@@ -43,6 +43,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hangup_rate_zero_traces_without_hangup_and_one_hangs_up() {
+        use tokio_tungstenite::tungstenite::Message as WsMessage;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("ws://{}/v1/quality", listener.local_addr().unwrap());
+        let service = QualityService::prepare(ServiceConfig::default()).unwrap();
+        let server = tokio::spawn(service.serve(listener, std::future::pending()));
+
+        // hangup_rate = 0 (integer) with hangup_on_detection = true must trace both beeps without hangup.
+        let (mut ws, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        ws.send(WsMessage::Text(json!({"type":"start","version":1,"sample_rate":16000,
+            "call_id":"rate0","session_id":"rate0","side":"callee","direction":"outbound",
+            "parameters":{"hangup_on_detection":true,"hangup_rate":0}}).to_string().into())).await.unwrap();
+        let samples: Vec<i16> = (0..16000).map(|i| if (0..4800).contains(&i) || (8000..12800).contains(&i) {
+            (12000.0 * (std::f64::consts::TAU * 1309.0 * i as f64 / 16000.0).sin()) as i16
+        } else { 0 }).collect();
+        let pcm: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+        ws.send(WsMessage::Binary(pcm.clone().into())).await.unwrap();
+        ws.send(WsMessage::Ping(vec![5].into())).await.unwrap();
+        let mut traces = 0;
+        loop {
+            let message = tokio::time::timeout(Duration::from_secs(3), ws.next()).await.unwrap().unwrap().unwrap();
+            match message {
+                WsMessage::Text(text) => {
+                    let event: Value = serde_json::from_str(&text).unwrap();
+                    assert_eq!(event["type"], "calltrace");
+                    traces += 1;
+                }
+                WsMessage::Pong(_) => break,
+                other => panic!("unexpected message: {other:?}"),
+            }
+        }
+        assert_eq!(traces, 2);
+        ws.close(None).await.unwrap();
+
+        // hangup_rate = 1 (integer) with hangup_on_detection = true must emit trace, hangup, then Close.
+        let (mut ws, _) = tokio_tungstenite::connect_async(&url).await.unwrap();
+        ws.send(WsMessage::Text(json!({"type":"start","version":1,"sample_rate":16000,
+            "call_id":"rate1","session_id":"rate1","side":"callee","direction":"outbound",
+            "parameters":{"hangup_on_detection":true,"hangup_rate":1}}).to_string().into())).await.unwrap();
+        ws.send(WsMessage::Binary(pcm.into())).await.unwrap();
+        for expected in ["calltrace", "hangup"] {
+            let text = tokio::time::timeout(Duration::from_secs(2), ws.next()).await.unwrap().unwrap().unwrap().into_text().unwrap();
+            let event: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(event["type"], expected);
+        }
+        let close = tokio::time::timeout(Duration::from_secs(2), ws.next()).await.unwrap().unwrap().unwrap();
+        assert!(matches!(close, WsMessage::Close(_)));
+        ws.flush().await.unwrap();
+        server.abort();
+    }
+
+    #[tokio::test]
     async fn connection_parameters_isolate_deadlines_and_reject_unloaded_asr() {
         use tokio_tungstenite::tungstenite::Message as WsMessage;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

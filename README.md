@@ -1,10 +1,10 @@
-# Realtime Quality v0.2.0：部署与 RustPBX Wholesale 集成
+# Realtime Quality v0.2.1：部署与 RustPBX Wholesale 集成
 
 本手册按部署顺序组织：**Release / 源码 → 模型 → 基础配置 → RustPBX 全局接入 → 协议 → 详细选项 → 数据库迁移**。
 
 默认例子同时启用英语 `en`、印尼语 / Bahasa Indonesia `id` 和 1309 / 660 Hz beep，观察 20 秒，只报告检测，**不挂断电话**。`inspect_ms` 的程序内置默认是 15000；示例显式设为 20000，以覆盖较长提示语。
 
-- [v0.2.0 Release](https://github.com/miuda-ai/realtime-quality/releases/tag/v0.2.0)
+- [v0.2.1 Release](https://github.com/miuda-ai/realtime-quality/releases/tag/v0.2.1)
 - [Wholesale 控制台操作 PDF](https://github.com/miuda-ai/realtime-quality/releases/download/v0.2.0/realtime-quality-console-zh.pdf)：只讲创建策略、租户 / 路由选择和查看通话轨迹截图。
 - 本文所有密钥都是占位值；源码、发布包和文档都不包含模型、录音或测试音频。
 
@@ -17,7 +17,7 @@
 以下命令先按当前操作系统选择目标，然后下载正式 Release 的压缩包和校验文件：
 
 ```bash
-VERSION=v0.2.0
+VERSION=v0.2.1
 case "$(uname -s):$(uname -m)" in
   Linux:x86_64) TARGET=x86_64-unknown-linux-gnu ;;
   Darwin:arm64) TARGET=aarch64-apple-darwin ;;
@@ -37,14 +37,14 @@ cd "$PACKAGE"
 ./realtime-quality --version
 ```
 
-预期版本为 `realtime-quality 0.2.0`。也可在 Release 页面手动下载。解压目录自带 `scripts/download_models.py`、`scripts/models.json`、配置示例和 `deploy/`，接着执行第 2、3 节；不是直接用空配置启动双语言识别。
+预期版本为 `realtime-quality 0.2.1`。也可在 Release 页面手动下载。解压目录自带 `scripts/download_models.py`、`scripts/models.json`、配置示例和 `deploy/`，接着执行第 2、3 节；不是直接用空配置启动双语言识别。
 
 ### 1.2 从源码构建同一版本
 
 需要 Rust stable（edition 2024）、C/C++ 链接工具。macOS 需要 Xcode Command Line Tools；Linux 需要常规编译工具链。Sherpa 构建依赖会下载原生库，因此构建时需访问 GitHub。
 
 ```bash
-git clone --branch v0.2.0 --depth 1 \
+git clone --branch v0.2.1 --depth 1 \
   https://github.com/miuda-ai/realtime-quality.git
 cd realtime-quality
 cargo test --locked
@@ -434,7 +434,7 @@ code 表示判断，method 表示检测方法。当前只实现 voicemail 检测
  "detail":{"method":"asr","language":"en","end_ms":3100}}
 ```
 
-PBX 没有额外的 allow_hangup 开关；只标记模式由服务不发送 hangup 保证。本服务在 `hangup_on_detection=true` 时先发检测 trace，再按 `hangup_rate`（默认 `1.0`，范围 `0.0–1.0`，仅在首次命中时按呼叫采样一次）决定是否发 hangup；决定挂断时立即发 hangup 并结束质检 Close，未命中采样或 `hangup_on_detection=false` 时持续报告独立检测直到 inspect_ms。PBX 最终 End trace 保存 `detail.source="realtime_quality"`、reason 和证据；不要只用通用 autohangup 枚举判断来源。
+PBX 没有额外的 allow_hangup 开关；只标记模式由服务不发送 hangup 保证。启用 `hangup_on_detection` 后，每条 WebSocket 在启动质检时按 `hangup_rate`（默认 `1.0`，范围 `0.0–1.0`）抽样一次。同一音轨的 ASR 和 beep 共用结果，主叫与被叫音轨独立抽样。检测命中时先发 trace；抽中则立即发 hangup 并结束质检，未抽中或关闭挂断时继续报告独立检测直到 `inspect_ms`。PBX 最终 End trace 保存 `detail.source="realtime_quality"`、reason 和证据；不要只用通用 autohangup 枚举判断来源。
 
 **error：终止该质检连接，保持电话继续。**
 
@@ -481,7 +481,7 @@ PBX 先处理顺序到达的 trace/hangup，再处理 Close；控制队列使用
 | stable_updates | 2；1–10 | 同一规则连续多少次解码更新满足后确认；partial 也计数 |
 | inspect_ms | 15000；20–300000 | 连接观察时间；示例 20000；到期关闭质检，不结束电话 |
 | hangup_on_detection | false | ASR 和 beep 共用；true 时先 trace，再按 `hangup_rate` 决定是否 hangup 并 Close |
-| hangup_rate | 1.0；0.0–1.0 | 仅在 `hangup_on_detection=true` 且已检测到命中时生效；支持 `0`/`1` 或小数，单通呼叫首次命中时采样一次（`0` 不挂断，`1` 全部挂断） |
+| hangup_rate | 1.0；0.0–1.0 | 启用 `hangup_on_detection` 时在每条音轨开始质检时抽样一次，命中后使用该结果；支持 `0`、`1` 或小数（`0` 只记录，`1` 每次检测命中均请求挂断） |
 
 #### 短句与顺序规则
 
@@ -503,7 +503,7 @@ phrase 匹配连续单词；忽略大小写、标点和连续空白，但要求�
 
 #### 重复检测
 
-hangup_on_detection=false 时，每段独立 beep、每种语言每个语句的首次确认命中都会上报。不限制连接总次数，但同一语句不断修正的 partial 不重复报告；持续的一段 tone 只报告一次。hangup_on_detection=true 时，首次命中会按 `hangup_rate` 决定整通呼叫是否挂断：命中采样则仅发第一次检测的 trace 和 hangup 后结束质检；未命中采样（或 `hangup_rate=0`）则不再挂断，继续上报后续独立检测的 trace 直到 inspect_ms。
+hangup_on_detection=false 时，每段独立 beep、每种语言每个语句的首次确认命中都会上报。不限制连接总次数，但同一语句不断修正的 partial 不重复报告；持续的一段 tone 只报告一次。hangup_on_detection=true 时，每条音轨使用质检开始时按 `hangup_rate` 抽样得到的结果。抽中的音轨在首次命中时发 trace 和 hangup，然后结束质检；未抽中的音轨继续上报独立检测的 trace 直到 `inspect_ms`。
 
 未检测到不等于真人：服务可以不发送任何结果，到观察截止时正常 Close。两种检测都关闭也正常结束连接。错误参数、未加载模型或服务不可达不应影响正常电话继续。
 
